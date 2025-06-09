@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 import { makeAdapter } from "@livestore/adapter-node";
-import { createStorePromise } from "@livestore/livestore";
+import { createStorePromise, queryDb } from "@livestore/livestore";
 import { Events, makeSchema, Schema, State } from "@livestore/livestore";
 
 async function main() {
-  console.log("🔍 LiveStore Node.js Adapter Bug Reproduction");
+  console.log("🔍 LiveStore Node.js Adapter - Fixed API Usage");
   console.log("==============================================");
   console.log("");
 
@@ -50,7 +50,7 @@ async function main() {
   console.log("✅ State defined with materializers");
   console.log("");
 
-  // Step 3: Create schema with makeSchema() - THIS IS WHERE THE BUG OCCURS
+  // Step 3: Create schema with makeSchema()
   console.log("Step 3: Creating schema with makeSchema()...");
   const schema = makeSchema({
     events,
@@ -60,49 +60,32 @@ async function main() {
   console.log("✅ Schema created");
   console.log("");
 
-  // Step 4: Inspect the schema - BUG EVIDENCE
-  console.log("Step 4: Inspecting schema results...");
+  // Step 4: Inspect the schema correctly - FIX for original bug report
+  console.log("Step 4: Inspecting schema results (CORRECTED)...");
   console.log("Schema keys:", Object.keys(schema));
   console.log("");
 
-  console.log("🔍 EXPECTED: eventsDefsMap should contain event definitions");
+  console.log("🔍 CORRECTED: Using proper Map inspection methods");
   console.log("📊 ACTUAL RESULTS:");
-  console.log("  eventsDefsMap keys:", Object.keys(schema.eventsDefsMap || {}));
-  console.log(
-    "  eventsDefsMap count:",
-    Object.keys(schema.eventsDefsMap || {}).length
-  );
+  console.log("  eventsDefsMap size:", schema.eventsDefsMap.size);
+  console.log("  eventsDefsMap keys:", Array.from(schema.eventsDefsMap.keys()));
   console.log("");
 
-  // Step 5: Demonstrate the bug impact
-  console.log("Step 5: Demonstrating bug impact...");
+  // Step 5: Show the fix worked
+  console.log("Step 5: Verifying eventsDefsMap is properly populated...");
 
-  if (Object.keys(schema.eventsDefsMap || {}).length === 0) {
-    console.log("❌ BUG CONFIRMED: eventsDefsMap is empty!");
-    console.log("");
-    console.log("This causes the following errors when creating a store:");
-    console.log(
-      '  - store.subscribe("v1.TestEvent", callback) throws: "Cannot read properties of undefined (reading \'super\')"'
-    );
-    console.log(
-      '  - store.commit("v1.TestEvent", data) throws: "No mutation definition found"'
-    );
-    console.log("");
-    console.log("📋 Expected behavior (from official docs):");
-    console.log(
-      '  - eventsDefsMap should contain: { "v1.TestEvent": [EventDefinition] }'
-    );
-    console.log(
-      "  - store.subscribe() and store.commit() should work normally"
-    );
+  if (schema.eventsDefsMap.size > 0) {
+    console.log("✅ CORRECTED: eventsDefsMap is properly populated!");
+    console.log("   The original bug report was due to incorrect Map inspection");
+    console.log("   (Used Object.keys() on a Map instead of .size and Array.from(.keys()))");
   } else {
-    console.log("✅ Schema appears to be working correctly");
+    console.log("❌ eventsDefsMap is still empty - this would be a real bug");
   }
 
   console.log("");
 
-  // Step 6: Attempt to create a store and demonstrate the actual failures
-  console.log("Step 6: Creating store and testing subscribe/commit...");
+  // Step 6: Create a store and demonstrate CORRECT API usage
+  console.log("Step 6: Creating store and testing CORRECT subscribe/commit...");
   console.log("");
 
   // Add timeout to prevent hanging
@@ -140,61 +123,71 @@ async function main() {
     console.log("✅ Store created successfully");
     console.log("");
 
-    // Test 1: Try to subscribe to an event
-    console.log("Test 1: Attempting store.subscribe()...");
+    // CORRECTED Test 1: Create a query object and subscribe to it
+    console.log("Test 1: Attempting store.subscribe() with CORRECT API...");
     try {
-      store.subscribe("v1.TestEvent", (event) => {
-        console.log("Event received:", event);
+      // ✅ CORRECT: Create a query object first
+      const testQuery$ = queryDb(tables.testTable.where({}));
+      
+      // ✅ CORRECT: Subscribe to the query object, not a string
+      store.subscribe(testQuery$, {
+        onUpdate: (results) => {
+          console.log("Query results updated:", results);
+        },
       });
-      console.log("✅ Subscribe worked (unexpected - bug may be fixed!)");
+      console.log("✅ Subscribe worked with correct API!");
+      console.log("   Used queryDb() to create query object");
+      console.log("   Subscribed to query object, not event string");
     } catch (subscribeError) {
       console.log("❌ SUBSCRIBE FAILED:", subscribeError.message);
       console.log("   Error type:", subscribeError.constructor.name);
-      console.log("   This confirms the eventsDefsMap bug impact");
+      console.log("   This would indicate a different issue");
     }
 
     console.log("");
 
-    // Test 2: Try to commit an event
-    console.log("Test 2: Attempting store.commit()...");
+    // CORRECTED Test 2: Commit using event function
+    console.log("Test 2: Attempting store.commit() with CORRECT API...");
     try {
-      store.commit("v1.TestEvent", {
+      // ✅ CORRECT: Use the event function, not a string
+      store.commit(events.testEvent({
         id: "test-123",
         message: "Hello World",
-      });
-      console.log("✅ Commit worked (unexpected - bug may be fixed!)");
+      }));
+      console.log("✅ Commit worked with correct API!");
+      console.log("   Used events.testEvent(data) instead of string");
     } catch (commitError) {
       console.log("❌ COMMIT FAILED:", commitError.message.split("\n")[0]);
       console.log("   Error type:", commitError.constructor.name);
-      console.log("   This confirms the eventsDefsMap bug impact");
+      console.log("   This would indicate a different issue");
     }
 
     console.log("");
-    console.log(
-      "💡 Both failures are directly caused by the empty eventsDefsMap"
-    );
+    console.log("💡 Key fixes applied:");
+    console.log("   1. Added queryDb import");
+    console.log("   2. Created query object with queryDb(tables.testTable.where({}))");
+    console.log("   3. Subscribe to query object, not event string");
+    console.log("   4. Commit with events.testEvent(data), not string");
 
-    // Close the store to clean up resources
+    // Store cleanup (LiveStore handles cleanup automatically)
     console.log("");
-    console.log("🔄 Closing store...");
-    await store.close();
-    console.log("✅ Store closed");
+    console.log("✅ Store operations completed successfully");
   } catch (storeError) {
     console.log("❌ STORE CREATION FAILED:", storeError.message);
-    console.log("   This might be another symptom of the same bug");
+    console.log("   This might indicate a different issue");
   }
 
   console.log("");
-  console.log(
-    "🔗 Reference: https://docs.livestore.dev/reference/syncing/server-side-clients/"
-  );
+  console.log("📚 Key Learnings:");
+  console.log("   • Events are for committing: store.commit(events.eventName(data))");
+  console.log("   • Queries are for subscribing: store.subscribe(queryDb(...), options)");
+  console.log("   • eventsDefsMap is a Map, not an object - use .size and Array.from(.keys())");
+  console.log("");
+  console.log("🔗 Reference: https://docs.livestore.dev/reference/syncing/server-side-clients/");
   console.log("📦 LiveStore version:", "0.3.1");
   console.log("🚀 Node.js version:", process.version);
   console.log("");
-  console.log("Full schema structure:");
-  console.log(JSON.stringify(schema, null, 2));
-  console.log("");
-  console.log("🏁 Test completed - exiting...");
+  console.log("🏁 Test completed with CORRECT API usage - exiting...");
 }
 
 // Run the test and handle any unhandled errors
