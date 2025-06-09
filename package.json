@@ -1,0 +1,14 @@
+{
+  "name": "livestore-node-bug-repro",
+  "version": "1.0.0",
+  "description": "Minimal reproduction of LiveStore Node.js adapter bug where makeSchema() doesn't register events in eventsDefsMap",
+  "type": "module",
+  "scripts": {
+    "test": "node test-bug.js"
+  },
+  "dependencies": {
+    "@livestore/adapter-node": "^0.3.1",
+    "@livestore/livestore": "^0.3.1",
+    "@livestore/sync-cf": "^0.3.1"
+  }
+} 
